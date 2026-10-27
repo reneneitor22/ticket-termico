@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Recibo que se imprime</title>
+<style>
+  :root{
+    --paper:#f2efe8;
+    --ink:#2f2c27;
+    --card:#2b2a28;
+    --card-2:#211f1d;
+    --line:#c9c3b6;
+    --slot-h:14px;
+    --zig:9px;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:
+      radial-gradient(120% 90% at 50% 0%, #fbf8f2 0%, #ece7dd 55%, #ddd7ca 100%);
+    color:var(--ink);
+    font:400 16px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Inter,system-ui,sans-serif;
+    display:flex; align-items:center; justify-content:center;
+    padding:32px 16px 56px;
+    -webkit-font-smoothing:antialiased;
+  }
+  /* grano de papel del fondo */
+  body::before{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/></filter><rect width='160' height='160' filter='url(%23n)' opacity='0.5'/></svg>");
+    opacity:.06; mix-blend-mode:multiply;
+  }
+  body::after{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+    background:radial-gradient(75% 60% at 50% 35%, transparent 45%, rgba(60,50,35,.14) 100%);
+    mix-blend-mode:multiply;
+  }
+
+  .stage{position:relative; z-index:1; width:min(420px,100%)}
+
+  /* ---------- terminal ---------- */
+  .term{
+    position:relative; z-index:3;
+    background:linear-gradient(#343230,#26241f);
+    border-radius:26px;
+    padding:14px 14px 22px;
+    box-shadow:
+      0 1px 0 rgba(255,255,255,.10) inset,
+      0 -1px 0 rgba(0,0,0,.5) inset,
+      0 18px 40px -12px rgba(40,32,20,.55),
+      0 3px 10px rgba(40,32,20,.25);
+  }
+  .term__top{display:flex; align-items:center; justify-content:space-between; padding:4px 6px 12px}
+  .mark{
+    width:30px;height:30px;border-radius:8px;
+    background:linear-gradient(#3c3936,#2c2926);
+    display:grid;place-items:center;
+    box-shadow:0 1px 0 rgba(255,255,255,.07) inset;
+  }
+  .mark svg{width:16px;height:16px;fill:#e8e3d8}
+  .home{
+    display:flex;align-items:center;gap:6px;
+    background:#3b3835;color:#e8e3d8;
+    border:0;border-radius:999px;
+    padding:8px 14px;font-size:14px;font-weight:500;
+    box-shadow:0 1px 0 rgba(255,255,255,.08) inset;
+    cursor:pointer;
+  }
+  .home:active{transform:translateY(1px)}
+  .home svg{width:13px;height:13px;fill:currentColor;opacity:.9}
+
+  .panel{
+    background:var(--card-2);
+    border-radius:16px;
+    padding:16px 18px 14px;
+    box-shadow:0 1px 0 rgba(255,255,255,.05) inset, 0 6px 14px -8px #000 inset;
+  }
+  .row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+  .plan{color:#efe9dd;font-size:clamp(15px,4.2vw,17px);white-space:nowrap;font-weight:600;letter-spacing:-.01em}
+  .sub{color:#9c968b;font-size:clamp(12px,3.4vw,13.5px);margin-top:2px;white-space:nowrap}
+  .tot-l{color:#9c968b;font-size:12.5px;text-align:right}
+  .tot{color:#efe9dd;font-size:clamp(19px,5.4vw,22px);white-space:nowrap;font-weight:600;letter-spacing:-.02em;text-align:right;font-variant-numeric:tabular-nums}
+
+  .status{display:flex;align-items:center;gap:10px;margin-top:16px;color:#a8a297;font-size:clamp(13px,3.7vw,14.5px)}
+  .status .txt{transition:opacity .18s ease}
+  .spin{width:17px;height:17px;flex:none;border-radius:50%;
+    border:1.8px solid rgba(232,227,216,.22);
+    border-top-color:rgba(232,227,216,.85);
+    animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .check{width:19px;height:19px;flex:none;border-radius:50%;background:#3ea36a;display:none;place-items:center}
+  .check svg{width:13px;height:13px;fill:none;stroke:#fff;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round;overflow:visible}
+  .check path{stroke-dasharray:21;stroke-dashoffset:21;animation:draw .34s .04s cubic-bezier(.3,.9,.4,1) forwards}
+  @keyframes draw{to{stroke-dashoffset:0}}
+  .check{transform:scale(.6);opacity:0;animation:pop .28s cubic-bezier(.2,1.5,.4,1) forwards}
+  @keyframes pop{to{transform:scale(1);opacity:1}}
+  .is-done .spin{display:none}
+  .is-done .check{display:grid}
+  .is-done .status{color:#cfc9bd}
+
+  /* ranura */
+  .slot{
+    position:absolute; left:26px; right:26px; bottom:9px; height:var(--slot-h);
+    border-radius:3px;
+    background:linear-gradient(#0d0c0b,#141312 55%,#2a2825);
+    box-shadow:0 1px 0 rgba(255,255,255,.08), 0 -2px 6px rgba(0,0,0,.5) inset;
+  }
+
+  /* ---------- papel ---------- */
+  .out{
+    position:relative; z-index:2;
+    margin:-12px clamp(22px,10.5%,44px) 0;      /* nace por debajo del borde de la terminal */
+    height:0;
+    clip-path:inset(0 -70px -70px -70px);   /* recorta SOLO el borde de arriba */
+    will-change:height;
+  }
+  .sheet{
+    position:absolute; left:0; right:0; bottom:0;
+    filter:drop-shadow(0 12px 16px rgba(60,48,30,.20)) drop-shadow(0 2px 3px rgba(60,48,30,.16));
+  }
+  .paper{
+    position:relative;
+    background:
+      linear-gradient(180deg, rgba(0,0,0,.16), rgba(0,0,0,0) 26px),
+      linear-gradient(92deg, rgba(0,0,0,.045), rgba(0,0,0,0) 18%, rgba(0,0,0,0) 82%, rgba(0,0,0,.045)),
+      #fbf9f4;
+    color:#33302b;
+    font:400 clamp(8.6px,2.85vw,11.5px)/1.75 ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    padding:22px clamp(12px,5%,22px) calc(20px + var(--zig));
+  }
+  /* fibra del papel */
+  .paper::before{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2'/></filter><rect width='120' height='120' filter='url(%23p)' opacity='0.55'/></svg>");
+    opacity:.07;mix-blend-mode:multiply;
+  }
+  .p-mark{width:34px;height:34px;border-radius:6px;background:#2b2a28;display:grid;place-items:center;margin:2px auto 18px}
+  .p-mark svg{width:17px;height:17px;fill:#f4f1ea}
+  .hr{border:0;border-top:1px dashed #cbc4b6;margin:12px 0}
+  .l{display:flex;justify-content:space-between;gap:10px;letter-spacing:.02em;white-space:nowrap}
+  .l .k{color:#6f6a61;text-transform:uppercase;font-size:.92em;letter-spacing:.09em}
+  .l .v{font-variant-numeric:tabular-nums}
+  .l.big{font-size:1.08em;font-weight:600;letter-spacing:.06em}
+  .l.big .v{font-size:1.28em}
+  .muted{color:#7b756b;font-size:.92em;letter-spacing:.04em;white-space:nowrap}
+  .meta{margin-top:14px;display:grid;gap:3px}
+  .meta .l .k{font-size:.87em}
+  .meta .l .v{font-size:.92em;color:#4b463f}
+
+  .barcode{display:flex;align-items:flex-end;justify-content:center;gap:1.5px;height:50px;margin:20px auto 6px;width:74%}
+  .barcode i{display:block;background:#2c2a26;height:100%}
+  .code{text-align:center;color:#8a847a;font-size:.88em;letter-spacing:.32em}
+
+  /* jitter mecánico del avance */
+  .feeding .sheet{animation:feed .085s steps(2,end) infinite}
+  @keyframes feed{0%{transform:translateY(0)}50%{transform:translateY(.6px)}100%{transform:translateY(0)}}
+
+  .replay{
+    display:block;margin:30px auto 0;
+    position:relative;z-index:5;border:0;border-radius:999px;cursor:pointer;
+    background:#2b2a28;color:#efe9dd;font-size:14px;font-weight:500;
+    padding:11px 20px;box-shadow:0 8px 20px -8px rgba(40,32,20,.6);
+  }
+  .replay:active{transform:translateY(1px)}
+  .replay[disabled]{opacity:.45;cursor:default}
+  @media (prefers-reduced-motion:reduce){
+    .feeding .sheet{animation:none}
+    .spin{animation-duration:2s}
+  }
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+
+  <div class="term">
+    <div class="term__top">
+      <div class="mark"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg></div>
+      <button class="home" type="button" id="home">
+        <svg viewBox="0 0 24 24"><path d="M12 3 2 12h3v9h6v-6h2v6h6v-9h3z"/></svg> Home
+      </button>
+    </div>
+
+    <div class="panel">
+      <div class="row">
+        <div>
+          <div class="plan">Pro plan</div>
+          <div class="sub">Annual subscription</div>
+        </div>
+        <div>
+          <div class="tot-l">Total</div>
+          <div class="tot">£230.40</div>
+        </div>
+      </div>
+      <div class="status">
+        <span class="spin"></span>
+        <span class="check"><svg viewBox="0 0 24 24"><path d="M5.5 12.5l4 4 9-9"/></svg></span>
+        <span class="txt" id="txt">Processing your order</span>
+      </div>
+    </div>
+
+    <div class="slot"></div>
+  </div>
+
+  <div class="out" id="out">
+   <div class="sheet" id="sheet">
+    <div class="paper" id="paper">
+      <div class="p-mark"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg></div>
+      <hr class="hr">
+      <div class="l"><span class="k">Pro plan</span><span class="v">£192.00</span></div>
+      <div class="muted">Annual subscription</div>
+      <hr class="hr">
+      <div class="l"><span class="k">Subtotal</span><span class="v">£192.00</span></div>
+      <div class="l"><span class="k">Tax</span><span class="v">£38.40</span></div>
+      <hr class="hr">
+      <div class="l big"><span class="k">Total paid</span><span class="v">£230.40</span></div>
+      <hr class="hr">
+      <div class="meta">
+        <div class="l"><span class="k">Order</span><span class="v">ORD-2048</span></div>
+        <div class="l"><span class="k">Paid with</span><span class="v">Visa •••• 4242</span></div>
+        <div class="l"><span class="k">Date</span><span class="v">11 AUG 2026 · 14:32</span></div>
+      </div>
+      <div class="barcode" id="barcode"></div>
+      <div class="code">ORD 2048</div>
+    </div>
+   </div>
+  </div>
+
+  <button class="replay" id="replay" type="button">Imprimir otra vez</button>
+</div>
+
+<script>
+(function(){
+  var stage=document.getElementById('stage'),
+      out=document.getElementById('out'),
+      paper=document.getElementById('paper'),
+      txt=document.getElementById('txt'),
+      replay=document.getElementById('replay'),
+      home=document.getElementById('home');
+
+  // código de barras
+  var sheet=document.getElementById('sheet');
+
+  // borde dentado (clip-path calculado sobre el ancho real)
+  function teeth(){
+    var w=paper.offsetWidth||300,
+        z=parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--zig'))||9,
+        n=Math.max(4,Math.round(w/(z*2))*2),            // par: empieza y acaba arriba
+        pts=['0 0','100% 0'];
+    for(var i=n;i>=0;i--){
+      pts.push((i/n*100).toFixed(3)+'% '+(i%2 ? '100%' : 'calc(100% - '+z+'px)'));
+    }
+    paper.style.clipPath='polygon('+pts.join(',')+')';
+  }
+
+  var bc=document.getElementById('barcode'), html='';
+  for(var i=0;i<46;i++){
+    var w=[1,1,2,3][Math.floor(Math.random()*4)];
+    html+='<i style="width:'+w+'px"></i>';
+    if(Math.random()<.35) html+='<i style="width:1px;background:transparent"></i>';
+  }
+  bc.innerHTML=html;
+
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var anim=null, timers=[];
+
+  function clearTimers(){ timers.forEach(clearTimeout); timers=[]; }
+  function later(fn,ms){ timers.push(setTimeout(fn,ms)); }
+
+  function setTxt(s){
+    txt.style.opacity=0;
+    later(function(){ txt.textContent=s; txt.style.opacity=1; },160);
+  }
+
+  function run(){
+    clearTimers();
+    if(anim) anim.cancel();
+    stage.classList.remove('is-done','feeding');
+    txt.textContent='Processing your order';
+    out.style.height='0px';
+    replay.disabled=true;
+
+    later(function(){
+      setTxt('Printing your receipt');
+      teeth();
+      var H=sheet.offsetHeight;
+      stage.classList.add('feeding');
+      var dur = reduce?400:2600, done=false;
+      anim=out.animate(
+        [{height:'0px'},{height:H+'px'}],
+        {duration:dur, easing:'cubic-bezier(.45,0,.55,1)', fill:'forwards'}
+      );
+      function finish(){
+        if(done) return; done=true;
+        out.style.height=H+'px';
+        stage.classList.remove('feeding');
+        setTxt('Order complete');
+        stage.classList.add('is-done');
+        replay.disabled=false;
+      }
+      anim.onfinish=finish;
+      later(finish, dur+40);          // respaldo si la pestaña está en 2.º plano
+    }, reduce?300:1100);
+  }
+
+  addEventListener('resize',teeth);
+  replay.addEventListener('click',run);
+  home.addEventListener('click',run);
+  run();
+})();
+</script>
+</body>
+</html>
